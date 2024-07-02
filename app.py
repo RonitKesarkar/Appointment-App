@@ -9,7 +9,8 @@ from flask_bcrypt import Bcrypt
 db=SQLAlchemy()
 app = Flask(__name__)
 bcrypt=Bcrypt(app)
-app.config['SQLALCHEMY_DATABASE_URI']='sqlite:///database.db'
+app.config['SQLALCHEMY_DATABASE_URI']='sqlite:///userdb.db'
+app.config['SQLALCHEMY_BINDS']={"doctor":"sqlite:///doctordb.db"}
 app.config['SECRET_KEY']='thisisasecretkey'
 db.init_app(app)
 
@@ -22,6 +23,12 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 class User(db.Model, UserMixin):
+    id=db.Column(db.Integer, primary_key=True)
+    username=db.Column(db.String(20), nullable=False, unique=True)
+    password=db.Column(db.String(80), nullable=False)
+
+class Doctor(db.Model, UserMixin):
+    __bind_key__="doctor"
     id=db.Column(db.Integer, primary_key=True)
     username=db.Column(db.String(20), nullable=False, unique=True)
     password=db.Column(db.String(80), nullable=False)
@@ -55,6 +62,17 @@ def login():
                 return redirect(url_for('dashboard'))
     return render_template("login.html", form=form)
 
+@app.route('/doctorlogin', methods=['GET', 'POST'])
+def doctorlogin():
+    form=LoginForm()
+    if form.validate_on_submit():
+        user=Doctor.query.filter_by(username=form.username.data).first()
+        if user:
+            if bcrypt.check_password_hash(user.password, form.password.data):
+                login_user(user)
+                return redirect(url_for('doctordashboard'))
+    return render_template("doctorlogin.html", form=form)
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     form=RegisterForm()
@@ -66,10 +84,26 @@ def register():
         return redirect(url_for('login'))
     return render_template("register.html", form=form)
 
+@app.route('/NYpVzBaI6hzIU7MP05hFH5vJapvhNmAJtDgpVhZTmcNaKZzLnS', methods=['GET', 'POST'])
+def doctorregister():
+    form=RegisterForm()
+    if form.validate_on_submit():
+        hashed_password=bcrypt.generate_password_hash(form.password.data)
+        new_user=Doctor(username=form.username.data, password=hashed_password)
+        db.session.add(new_user)
+        db.session.commit()
+        return redirect(url_for('home'))
+    return render_template("NYpVzBaI6hzIU7MP05hFH5vJapvhNmAJtDgpVhZTmcNaKZzLnS.html", form=form)
+
 @app.route('/dashboard', methods=['GET', 'POST'])
 @login_required
 def dashboard():
     return render_template("dashboard.html")
+
+@app.route('/doctordashboard', methods=['GET', 'POST'])
+@login_required
+def doctordashboard():
+    return render_template("doctordashboard.html")
 
 @app.route('/logout', methods=['GET', 'POST'])
 @login_required
